@@ -585,6 +585,10 @@ footer p {
 }
 
 .adminContent {
+  padding: 0;
+}
+
+.adminContentInner {
   padding: 24px;
 }
 
@@ -869,6 +873,25 @@ footer p {
   font-size: 14px;
 }
 
+.adminSuccess {
+  color: #2f6b3f;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.adminSiteTitlePreviewCard {
+  padding: 16px;
+  border: 1px solid #ece3d6;
+  background: #fff;
+}
+
+.adminSiteTitlePreviewHeading {
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .adminActions {
   display: flex;
   justify-content: flex-start;
@@ -945,8 +968,12 @@ footer p {
 }
 
 @media screen and (max-width: 640px) {
-  .adminContent {
+  .adminContentInner {
     padding: 16px;
+  }
+
+  .adminDemoBanner {
+    padding: 12px 16px;
   }
 
   .adminTitle,
@@ -963,4 +990,171 @@ footer p {
   .imgContainer {
     height: 450px;
   }
+}
+
+.adminDemoBanner {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 24px;
+  border-bottom: 1px solid #e2c7c7;
+  background: #fff4f4;
+  box-shadow: 0 2px 10px rgb(155 28 28 / 8%);
+}
+
+.adminDemoBannerText strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: #9b1c1c;
+}
+
+.adminDemoBannerText .adminMuted {
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+.adminDemoBannerButton {
+  flex-shrink: 0;
+  min-height: 42px;
+  padding: 0 22px;
+  font-size: 14px;
+  box-shadow: 0 8px 18px rgb(155 28 28 / 24%);
+}
+
+.adminDemoSidebarBadge {
+  padding: 10px 12px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  background: rgb(255 255 255 / 6%);
+  color: #f8d7d7;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.adminSidebarNote {
+  color: rgb(248 244 236 / 72%);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.adminResetButton {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.adminDemoGalleryRoot {
+  position: relative;
+  min-height: 100vh;
+  background: #fff;
+}
+
+.adminDemoFloatingBar {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid #ddd3c3;
+  background: rgb(255 253 250 / 94%);
+  box-shadow: 0 8px 24px rgb(17 17 17 / 12%);
+}
+
+.adminDemoFloatingActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.adminDemoFloatingLink,
+.adminDemoFloatingButton {
+  border: 0;
+  background: transparent;
+  color: #9b1c1c;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.adminDemoFloatingButton {
+  color: #6b645b;
+}
+
+.adminDemoBadge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f7e3e3;
+  color: #9b1c1c;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.siteTitle:has(.adminEditableSiteTitle),
+.siteTitle:has(.adminEditableSiteTitleEditor) {
+  opacity: 1;
+  padding: 1px 0 1px 8px;
+  animation: none;
+}
+
+.siteTitle .adminEditableSiteTitle {
+  display: block;
+  width: 260px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1rem;
+  text-align: left;
+  cursor: text;
+  opacity: 1;
+  animation: none;
+  transform: none;
+}
+
+.siteTitle .adminEditableSiteTitle:hover {
+  outline: 1px dashed rgb(153 28 28 / 35%);
+  outline-offset: 2px;
+}
+
+.siteTitle .adminEditableSiteTitleEditor {
+  display: block;
+  width: 260px;
+}
+
+.siteTitle .adminEditableSiteTitleInput {
+  display: block;
+  width: 100%;
+  margin: 0 0 4px;
+  padding: 1px 0 1px 8px;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #111;
+  font: inherit;
+  line-height: 1rem;
+  font-weight: 700;
+  font-size: 14px;
+  opacity: 1;
+  animation: none;
+  transform: none;
+}
+
+.siteTitle .adminEditableSiteTitleHint {
+  display: block;
+  margin-top: 4px;
+  color: #666;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.2;
 }

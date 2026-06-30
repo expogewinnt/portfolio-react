@@ -10,7 +10,7 @@ export default async function AdminDashboardPage() {
   return (
     <AdminShell
       title="Dashboard"
-      description="公開ギャラリーの管理基盤です。現在はローカルデータを参照する土台段階です。"
+      description="公開ギャラリーの管理画面です。変更は works.json と画像ファイルに反映されます。"
     >
       <section className="adminStatsGrid">
         <article className="adminStatCard">
@@ -23,7 +23,7 @@ export default async function AdminDashboardPage() {
         </article>
         <article className="adminStatCard">
           <span className="adminStatLabel">Storage</span>
-          <strong className="adminStatValue">Local Copy</strong>
+          <strong className="adminStatValue">works.json</strong>
         </article>
       </section>
 

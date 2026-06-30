@@ -1,5 +1,5 @@
-/* eslint-disable @next/next/no-img-element */
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { useActionState } from "react";
 import {
@@ -10,15 +10,12 @@ import {
 } from "@/app/admin/actions";
 import { ConfirmDeleteButton } from "@/components/admin/confirm-delete-button";
 import type { AdminWork } from "@/lib/admin-works";
+import { htmlUnescape } from "@/lib/gallery-utils";
 
 type WorkEditorFormProps = {
   mode: "create" | "edit";
   work?: AdminWork | null;
 };
-
-function htmlUnescape(value: string) {
-  return value.replaceAll("&amp;", "&");
-}
 
 export function WorkEditorForm({ mode, work }: WorkEditorFormProps) {
   const [state, formAction, isPending] = useActionState<WorkFormState, FormData>(
@@ -99,18 +96,16 @@ export function WorkEditorForm({ mode, work }: WorkEditorFormProps) {
               <>
                 <img
                   src={`/images/small/${work.img}`}
-                  alt={work.ttl}
+                  alt={htmlUnescape(work.ttl)}
                   className="adminPreviewImage"
                 />
                 <div>
-                  <p className="adminPreviewTitle">{work.ttl}</p>
+                  <p className="adminPreviewTitle">{htmlUnescape(work.ttl)}</p>
                   <p className="adminMuted">{work.img}</p>
                 </div>
               </>
             ) : (
-              <p className="adminMuted">
-                新規作成フォームです。画像アップロード欄は次段階で追加します。
-              </p>
+              <p className="adminMuted">作品が見つかりません。</p>
             )}
           </div>
         </div>

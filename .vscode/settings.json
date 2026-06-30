@@ -1,0 +1,12 @@
+{
+  "terminal.integrated.profiles.osx": {
+    "portfolio (Node 20)": {
+      "path": "/bin/zsh",
+      "args": [
+        "-lic",
+        "source \"$HOME/.nvm/nvm.sh\" && nvm use \"$(cat \"$PWD/.nvmrc\")\" >/dev/null 2>&1; exec zsh -il"
+      ]
+    }
+  },
+  "terminal.integrated.defaultProfile.osx": "portfolio (Node 20)"
+}

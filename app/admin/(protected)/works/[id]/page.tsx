@@ -16,10 +16,7 @@ export default async function AdminWorkDetailPage({
   }
 
   return (
-    <AdminShell
-      title={work.ttl}
-      description="編集フォームの骨組みです。永続化前提の項目に合わせて表示しています。"
-    >
+    <AdminShell title={work.ttl} description="本番ギャラリー用の編集画面です。">
       <WorkEditorForm mode="edit" work={work} />
     </AdminShell>
   );

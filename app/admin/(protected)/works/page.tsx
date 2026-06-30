@@ -10,7 +10,7 @@ export default async function AdminWorksPage() {
   const adminWorks = await getAdminWorks();
 
   return (
-    <AdminShell title="Works">
+    <AdminShell title="Works" description="本番ギャラリー用の作品一覧です。">
       <section className="adminPanel">
         <div className="adminPanelHeader">
           <h2 className="adminPanelTitle">All Works</h2>

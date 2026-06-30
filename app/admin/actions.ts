@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { ADMIN_SESSION_COOKIE, getAdminConfig } from "@/lib/admin-config";
+import { ADMIN_SESSION_COOKIE, getAdminConfig, getAdminSetupMessage } from "@/lib/admin-config";
 import { createWork, deleteWorkByImageName, updateWorkByImageName } from "@/lib/works-store";
 import { getAdminWorkById } from "@/lib/admin-works";
 
@@ -21,6 +21,11 @@ export async function loginAction(
   const username = String(formData.get("username") ?? "").trim();
   const password = String(formData.get("password") ?? "").trim();
   const config = getAdminConfig();
+  if (!config) {
+    return {
+      error: getAdminSetupMessage()
+    };
+  }
 
   if (username !== config.username || password !== config.password) {
     return {

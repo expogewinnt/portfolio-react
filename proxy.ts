@@ -9,8 +9,9 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const config = getAdminConfig();
   const session = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-  if (session === getAdminConfig().sessionToken) {
+  if (config && session === config.sessionToken) {
     return NextResponse.next();
   }
 
