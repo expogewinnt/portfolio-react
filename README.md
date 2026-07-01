@@ -95,8 +95,8 @@
 ### セットアップ
 
 ```bash
-git clone git@github.com:expogewinnt/portofolio-react.git
-cd portofolio-react
+git clone git@github.com:expogewinnt/portfolio-react.git
+cd portfolio-react
 npm install
 
 cp .env.example .env.local
