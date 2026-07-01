@@ -19,8 +19,10 @@ export function DemoSiteTitleForm() {
 
   useEffect(() => {
     const [nextLine1, nextLine2] = parseSiteTitleLines(siteTitle);
+    /* eslint-disable react-hooks/set-state-in-effect -- sync form fields from persisted context */
     setLine1(nextLine1);
     setLine2(nextLine2);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [siteTitle]);
 
   const handleLineChange = (value: string, setter: (next: string) => void) => {

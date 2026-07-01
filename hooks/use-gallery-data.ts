@@ -51,9 +51,11 @@ export function useGalleryData(initialWorks: WorkItem[]) {
 
   useEffect(() => {
     const state = loadOrSeedGallery(initialWorks);
+    /* eslint-disable react-hooks/set-state-in-effect -- hydrate from localStorage after mount */
     setWorks(state.works);
     setSiteTitleState(state.siteTitle);
     setIsReady(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [initialWorks]);
 
   const getWorkById = useCallback(
