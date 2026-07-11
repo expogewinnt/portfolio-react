@@ -1,22 +1,36 @@
 # Portfolio React
 
-モダンフロントエンド技術（Next.js / React / TypeScript）で再構築した、個人ポートフォリオサイトです。  
-公開ギャラリー・本番管理画面・採用担当者向けデモモードを URL 単位で分離し、**「本番データを汚さずに体験してもらう」** という運用要件を、コードとインフラの両面で満たす構成を採用しています。
+> **Legacy → Modern Migration Proof**  
+> ほぼ Vanilla JS で構築されたレガシーポートフォリオを、**AI 駆動開発（Cursor / Claude）** で Next.js (App Router) へリプレイスした実証プロジェクトです。
 
----
+| | レガシー | モダン（本リポジトリ） |
+|---|---|---|
+| **公開 URL** | [expogewinnt.github.io/portfolio/](https://expogewinnt.github.io/portfolio/) | [portfolio-react-202607.vercel.app/](https://portfolio-react-202607.vercel.app/) |
+| **ソース** | [portfolio](https://github.com/expogewinnt/portfolio) | [portfolio-react](https://github.com/expogewinnt/portfolio-react) |
+| **ホスティング** | GitHub Pages | Vercel + GitHub Actions |
+| **フロントエンド** | Vanilla JS（静的 HTML / CSS / JS、UA 判定で PC / SP 分岐） | Next.js 16 / React 19 / TypeScript |
+| **スタイル** | `css/`（PC / SP 別） | `app/globals.css`（レガシー CSS を統合移植） |
+| **データ層** | `json/data.json`（XMLHttpRequest）+ `img/` | Server Component + `src/data/works.json` / sharp |
+| **品質担保** | 手動確認 | Lint / 型検査 / Vitest / Playwright（CI 自動化） |
 
-## 概要
+**移行で達成したこと**
 
-本リポジトリは、従来の静的ポートフォリオを App Router ベースの Next.js アプリケーションへ移行したものです。  
-作品データは `src/data/works.json` を正とし、画像はサーバー側で複数サイズに変換して `public/images/` に配置します。
+- [x] 公開ギャラリーの UI/UX をレガシー版と同等に再現（hash ナビ・画像プリロード・サムネイル横スクロール）
+- [x] 本番 API / ストレージを汚さない **デモモード**（`/demo`）— `localStorage` サンドボックス
+- [x] `localStorage` 5MB 制限を前提とした **クライアント画像圧縮**（Canvas API — 720px / JPEG 70%）
+- [x] 本番管理画面の認証分離（環境変数 + Cookie セッション）
+- [x] リプレイス後のデリバリー品質を CI/CD で担保
 
-採用面接やカジュアル面談において、リードエンジニアが **管理画面の操作感・拡張性・リスク配慮** をその場で確認できるよう、デモ専用ルート（`/demo` / `/demo/admin`）を設けています。
+公開ギャラリーはレガシーからの **リプレイス**、管理画面・デモモードは移行先で **新規構築** した拡張です。  
+第三者が本番データに触れずに **操作感・アーキテクチャ・リスク配慮** を確認できるよう、本番（`/admin`）とデモ（`/demo/admin`）を URL 単位で分離しています。
+
+**AI 協働プロセスの詳細** → [AGENT.md](./AGENT.md)
 
 ---
 
 ## Features
 
-### 1. 採用担当者向けデモモード（お試し機能）
+### 1. デモモード（サンドボックス環境）
 
 | ルート | 用途 | 認証 | データ保存先 |
 |---|---|---|---|
@@ -27,24 +41,26 @@
 
 **設計意図**
 
-採用担当者に管理画面を触ってもらう際、本番の `works.json` や画像ファイルを書き換えるリスクは許容できません。  
-そこでデモモードでは、サーバーへの永続化を行わず、クライアントの `localStorage` にのみ状態を保持する **サンドボックス構成** を採用しました。
+管理画面の動作を第三者に体験してもらう際、本番の `works.json` や画像ファイルを書き換えるリスクは許容できません。  
+そこでデモモードでは、サーバーへの永続化を行わず、クライアントの `localStorage` にのみ状態を保持する **サンドボックス構成** としました。
 
 - 初回アクセス時は `works.json` の直近 **20 件** をシードデータとして投入
 - 画像アップロードは Canvas API で **横幅 720px / JPEG 70%** に圧縮し、Base64 Data URL として保存
 - `QuotaExceededError`（localStorage 容量上限）を捕捉し、ユーザーへ明示的に通知
 - 「リセット」操作で初期状態へ復帰可能
 
-この設計により、**サーバーを汚さない**・**ブラウザの 5MB 制限内に収める**・**面接官が安全に CRUD を試せる** という三つの要件を同時に満たしています。
+この設計により、**サーバーを汚さない**・**ブラウザの 5MB 制限内に収める**・**本番に影響なく CRUD を試せる** という三つの要件を同時に満たしています。
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  本番パス                    デモパス                    │
-│  /admin → Server Actions    /demo/admin → Client only   │
-│         → works.json                 → localStorage     │
-│         → sharp (画像変換)           → Canvas (圧縮)     │
-└─────────────────────────────────────────────────────────┘
-```
+![本番パスとデモパスの比較](docs/diagrams/admin-paths-split.png)
+
+*図: 本番パス（Production / 左）とデモパス（Demo / 右）の責務分離*
+
+| | 本番パス | デモパス |
+|---|---|---|
+| ルート | `/admin` | `/demo/admin` |
+| 実行環境 | Server Actions | Client only |
+| データ保存 | `works.json` | `localStorage` |
+| 画像処理 | sharp（画像変換） | Canvas（圧縮） |
 
 ### 2. 本番管理画面の認証分離
 
@@ -72,16 +88,21 @@
 
 ## Tech Stack
 
+### 移行後（本リポジトリ）
+
 | カテゴリ | 技術 |
 |---|---|
 | Framework | Next.js 16（App Router） |
 | UI | React 19 |
 | Language | TypeScript 5.x |
+| スタイル | グローバル CSS（`app/globals.css` — レガシー CSS 移植） |
 | 画像処理（本番） | sharp |
 | 画像処理（デモ） | Canvas API（クライアント） |
 | 認証 | Cookie ベースセッション + 環境変数 |
 | ホスティング | Vercel |
+| CI/CD | GitHub Actions |
 | Lint | ESLint（eslint-config-next） |
+| テスト | Vitest（ユニット）/ Playwright（E2E スモーク） |
 | Runtime | Node.js 20.9+（`.nvmrc` で固定） |
 
 ---
@@ -134,22 +155,21 @@ npm run test:e2e   # Playwright（E2Eスモーク）
 
 `.github/workflows/ci.yml` で、push / PR 時に以下の品質ゲートを実行します。
 
-```
-┌──────────┐    ┌─────────────────────────────────────┐    ┌─────────┐
-│  Push /  │───▶│  GitHub Actions                     │───▶│ Vercel  │
-│  PR      │    │  1. ESLint                          │    │ Deploy  │
-└──────────┘    │  2. TypeScript (tsc / next build)   │    └─────────┘
-                │  3. Vitest（ユニットテスト）           │
-                │  4. Playwright（E2E）                │
-                └─────────────────────────────────────┘
-```
+![CI/CD パイプライン](docs/diagrams/ci-cd-pipeline.png)
+
+*図: Push / PR → GitHub Actions（Lint / 型検査 / テスト）→ Vercel デプロイ*
+
+| ジョブ | 実行内容 |
+|---|---|
+| **quality** | `npm run lint` → `npm run typecheck` → `npm run test` |
+| **e2e** | `npm run build` → Playwright（`/` と `/demo` の表示スモーク） |
 
 | レイヤー | 目的 |
 |---|---|
 | **Lint** | コーディング規約・潜在的バグの早期検出 |
-| **Type check** | 型安全性の担保（ビルド時に検証） |
-| **Vitest** | ユーティリティ層の単体テスト（11本） |
-| **Playwright** | `/` と `/demo` の表示スモーク（1本） |
+| **Type check** | 型安全性の担保 |
+| **Vitest** | ユーティリティ層の単体テスト（11 本） |
+| **Playwright** | 公開・デモギャラリーの表示スモーク（1 本） |
 | **Vercel** | main ブランチマージ後の自動デプロイ |
 
 デモモードのような **クライアント完結型の機能** は、ブラウザ API（`localStorage` / Canvas）への依存が強いため、Vitest ではロジック層、Playwright では実ブラウザ上の動作を分担して検証する方針です。
@@ -175,7 +195,7 @@ npm run test:e2e   # Playwright（E2Eスモーク）
 
 ```
 app/
-  page.tsx                 # 本番ギャラリー
+  page.tsx                 # 本番ギャラリー（Server Component）
   admin/                   # 本番管理（認証必須）
   demo/                    # デモギャラリー + デモ管理
 components/
@@ -184,14 +204,17 @@ components/
 hooks/
   use-gallery-data.ts      # デモ用 CRUD + localStorage 永続化
 lib/
+  gallery-view-utils.ts    # hash ナビ・プリロード等（レガシー JS から移植）
   works-store.ts           # 本番データ層（server-only, sharp）
   gallery-storage.ts       # デモ用 localStorage 層
   gallery-image.ts         # デモ用クライアント画像圧縮
   admin-config.ts          # 認証設定（環境変数）
+proxy.ts                   # 本番管理ルートの認証ガード
 ```
 
 ---
 
-## License
+## 関連ドキュメント
 
-Private — 採用選考・技術評価目的での閲覧を想定しています。
+- [AGENT.md](./AGENT.md) — AI 駆動開発の実証記録（レガシー解析・リスクヘッジ・CI/CD 構築プロセス）
+- [gallery-localstorage-implementation-plan.md](./gallery-localstorage-implementation-plan.md) — デモモード実装の詳細計画書

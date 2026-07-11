@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" role="img" aria-labelledby="title desc">
+  <title id="title">開発アプローチの概要</title>
+  <desc id="desc">人間が要件と制約を定義し、AIが実装と統合を担当する役割分担</desc>
+  <defs>
+    <style>
+      .box { fill: #f6f8fa; stroke: #d0d7de; stroke-width: 1.5; }
+      .title { font: 600 15px "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; fill: #24292f; }
+      .item { font: 13px "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; fill: #57606a; }
+      .flow { font: 13px "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; fill: #24292f; }
+      .connector { stroke: #8c959f; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+    </style>
+    <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#8c959f"/>
+    </marker>
+  </defs>
+
+  <rect class="box" x="40" y="20" width="720" height="140" rx="8"/>
+  <text class="title" x="60" y="48">人間（オーナー）</text>
+  <text class="item" x="60" y="74">・レガシー制約の把握と移行方針の決定</text>
+  <text class="item" x="60" y="96">・ビジネス要件の定義（本番を汚さないデモ）</text>
+  <text class="item" x="60" y="118">・Client / Server の責務分界</text>
+  <text class="item" x="420" y="74">・リスクの特定と指示（5MB 制限、QuotaExceededError）</text>
+  <text class="item" x="420" y="96">・品質ゲートの定義（Lint / 型検査 / テスト）</text>
+
+  <line class="connector" x1="200" y1="175" x2="200" y2="225"/>
+  <text class="flow" x="230" y="205">要件・制約・レビュー</text>
+
+  <rect class="box" x="40" y="250" width="720" height="140" rx="8"/>
+  <text class="title" x="60" y="278">AI（Cursor Agent）</text>
+  <text class="item" x="60" y="304">・レガシー JS の React / TypeScript 翻訳</text>
+  <text class="item" x="60" y="326">・App Router / Server Actions / フック実装</text>
+  <text class="item" x="60" y="348">・統合・リファクタリング</text>
+  <text class="item" x="420" y="304">・CI ワークフロー・テスト整備</text>
+  <text class="item" x="420" y="326">・ビルドエラー・ハイドレーション修正</text>
+</svg>

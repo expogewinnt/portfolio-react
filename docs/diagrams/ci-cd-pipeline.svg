@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 200" role="img" aria-labelledby="title desc">
+  <title id="title">CI/CD pipeline</title>
+  <desc id="desc">Push or PR triggers GitHub Actions quality gates, then deploys to Vercel.</desc>
+  <defs>
+    <style>
+      .box { fill: #f6f8fa; stroke: #d0d7de; stroke-width: 1.5; }
+      .title { font: 600 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #24292f; }
+      .step { font: 13px ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; fill: #24292f; }
+      .connector { stroke: #8c959f; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+    </style>
+    <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#8c959f"/>
+    </marker>
+  </defs>
+
+  <rect class="box" x="20" y="60" width="120" height="80" rx="8"/>
+  <text class="title" x="44" y="92">Push /</text>
+  <text class="title" x="58" y="114">PR</text>
+
+  <line class="connector" x1="140" y1="100" x2="175" y2="100"/>
+
+  <rect class="box" x="180" y="30" width="420" height="140" rx="8"/>
+  <text class="title" x="200" y="58">GitHub Actions</text>
+  <text class="step" x="200" y="84">1. ESLint</text>
+  <text class="step" x="200" y="106">2. TypeScript (tsc)</text>
+  <text class="step" x="200" y="128">3. Vitest (unit tests)</text>
+  <text class="step" x="200" y="150">4. Playwright (E2E after build)</text>
+
+  <line class="connector" x1="600" y1="100" x2="635" y2="100"/>
+
+  <rect class="box" x="640" y="60" width="120" height="80" rx="8"/>
+  <text class="title" x="658" y="92">Vercel</text>
+  <text class="title" x="652" y="114">Deploy</text>
+</svg>
