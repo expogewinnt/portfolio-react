@@ -10,7 +10,7 @@
 | **ホスティング** | GitHub Pages | Vercel + GitHub Actions |
 | **フロントエンド** | Vanilla JS（静的 HTML / CSS / JS、UA 判定で PC / SP 分岐） | Next.js 16 / React 19 / TypeScript |
 | **スタイル** | `css/`（PC / SP 別） | `app/globals.css`（レガシー CSS を統合移植） |
-| **データ層** | `json/data.json`（XMLHttpRequest）+ `img/` | Server Component + `src/data/works.json` / sharp |
+| **データ層** | `json/data.json`（XMLHttpRequest）+ `img/` | Server Component + microCMS（フォールバック: `works.json` / sharp） |
 | **品質担保** | 手動確認 | Lint / 型検査 / Vitest / Playwright（CI 自動化） |
 
 **移行で達成したこと**
@@ -19,6 +19,7 @@
 - [x] 本番 API / ストレージを汚さない **デモモード**（`/demo`）— `localStorage` サンドボックス
 - [x] `localStorage` 5MB 制限を前提とした **クライアント画像圧縮**（Canvas API — 720px / JPEG 70%）
 - [x] 本番管理画面の認証分離（環境変数 + Cookie セッション）
+- [x] Vercel 読み取り専用 FS を踏まえた **microCMS 連携**（自作 `/admin` UI 維持）
 - [x] リプレイス後のデリバリー品質を CI/CD で担保
 
 公開ギャラリーはレガシーからの **リプレイス**、管理画面・デモモードは移行先で **新規構築** した拡張です。  
@@ -34,8 +35,8 @@
 
 | ルート | 用途 | 認証 | データ保存先 |
 |---|---|---|---|
-| `/` | 本番ギャラリー | 不要 | `works.json` + 静的画像 |
-| `/admin/**` | 本番管理 | 必須（Cookie セッション） | サーバー（JSON + ファイル） |
+| `/` | 本番ギャラリー | 不要 | microCMS（未設定時は `works.json` + 静的画像） |
+| `/admin/**` | 本番管理 | 必須（Cookie セッション） | microCMS（未設定時は JSON + ファイル） |
 | `/demo` | デモギャラリー | 不要 | ブラウザ `localStorage` |
 | `/demo/admin/**` | デモ管理 | 不要 | ブラウザ `localStorage` |
 
@@ -59,8 +60,8 @@
 |---|---|---|
 | ルート | `/admin` | `/demo/admin` |
 | 実行環境 | Server Actions | Client only |
-| データ保存 | `works.json` | `localStorage` |
-| 画像処理 | sharp（画像変換） | Canvas（圧縮） |
+| データ保存 | microCMS（フォールバック: `works.json`） | `localStorage` |
+| 画像処理 | microCMS CDN / sharp | Canvas（圧縮） |
 
 ### 2. 本番管理画面の認証分離
 
@@ -72,9 +73,26 @@
 `components/gallery-view.tsx` に表示ロジックを集約し、本番（`/`）とデモ（`/demo`）で同一 UI を再利用しています。  
 デモ固有のデータソース差分は Context（`AdminGalleryProvider`）とカスタムフック（`useGalleryData`）で吸収しています。
 
-### 4. 本番画像パイプライン（sharp）
+### 4. microCMS 連携（本番データ層）
 
-本番アップロード時はサーバー側で以下のバリアントを生成します。
+Vercel のファイルシステムは読み取り専用のため、本番の CRUD は **microCMS** を永続化先にします。  
+自作の `/admin` UI と認証はそのまま維持し、データ層だけを差し替える構成です（デモモードは `localStorage` のまま変更なし）。
+
+| 条件 | 保存先 |
+|---|---|
+| `MICROCMS_SERVICE_DOMAIN` + `MICROCMS_API_KEY` あり | microCMS（API ID: `works`） |
+| 未設定 | 従来どおり `works.json` + `public/images/` + sharp（ローカル開発向け） |
+
+- フィールド: `title` / `charge` / `image`
+- 画像は Media API で 1 枚アップロードし、CDN クエリ（`?w=320` 等）でリサイズ
+- 初回移行: `npm run migrate:microcms`（`works.json` → microCMS）
+- Dashboard の Storage 表示で `microCMS` / `works.json` を確認可能
+
+詳細手順 → [microcms-integration-plan.md](./microcms-integration-plan.md)
+
+### 5. 本番画像パイプライン（local フォールバック / sharp）
+
+microCMS 未設定時のローカル開発では、サーバー側で以下のバリアントを生成します。
 
 | 用途 | 最大サイズ | 品質 |
 |---|---|---|
@@ -82,7 +100,7 @@
 | `sp/`（スマホ） | 1200px 幅 | JPEG 88% |
 | `small/`（サムネ） | 320×180（cover） | JPEG 86% |
 
-デモと本番で画像処理の責務を明確に分離し、それぞれの制約（ディスク容量 vs. localStorage 5MB）に最適化しています。
+デモと本番で画像処理の責務を明確に分離し、それぞれの制約に最適化しています。
 
 ---
 
@@ -96,7 +114,9 @@
 | UI | React 19 |
 | Language | TypeScript 5.x |
 | スタイル | グローバル CSS（`app/globals.css` — レガシー CSS 移植） |
-| 画像処理（本番） | sharp |
+| 本番 CMS | microCMS（環境変数で切替） |
+| 画像処理（本番 / local） | sharp |
+| 画像処理（本番 / microCMS） | Media API + CDN リサイズ |
 | 画像処理（デモ） | Canvas API（クライアント） |
 | 認証 | Cookie ベースセッション + 環境変数 |
 | ホスティング | Vercel |
@@ -121,7 +141,18 @@ cd portfolio-react
 npm install
 
 cp .env.example .env.local
-# .env.local を編集（本番管理画面の認証情報）
+# .env.local を編集
+#   必須: ADMIN_USERNAME / ADMIN_PASSWORD / ADMIN_SESSION_TOKEN
+#   任意: MICROCMS_SERVICE_DOMAIN / MICROCMS_API_KEY
+#         （未設定なら works.json モードで動作）
+```
+
+microCMS を使う場合は、サービス側で API ID `works`（`title` / `charge` / `image`）を作成し、  
+**読み取り + 書き込み + メディアアップロード** 権限の API キーを `.env.local` に設定してください。  
+既存データの初回投入:
+
+```bash
+npm run migrate:microcms
 ```
 
 ### 開発サーバー
@@ -137,16 +168,19 @@ npm run dev
 | http://localhost:3000/demo | デモギャラリー |
 | http://localhost:3000/demo/admin | デモ管理 |
 
+`/admin` Dashboard の Storage が `microCMS`（または未設定時は `works.json`）になっていることを確認してください。
+
 ### スクリプト
 
 ```bash
-npm run dev        # 開発サーバー
-npm run build      # 本番ビルド（型チェック含む）
-npm run start      # 本番サーバー
-npm run lint       # ESLint
-npm run typecheck  # TypeScript（tsc --noEmit）
-npm run test       # Vitest（ユニットテスト）
-npm run test:e2e   # Playwright（E2Eスモーク）
+npm run dev              # 開発サーバー
+npm run build            # 本番ビルド（型チェック含む）
+npm run start            # 本番サーバー
+npm run lint             # ESLint
+npm run typecheck        # TypeScript（tsc --noEmit）
+npm run test             # Vitest（ユニットテスト）
+npm run test:e2e         # Playwright（E2Eスモーク）
+npm run migrate:microcms # works.json → microCMS 初回インポート
 ```
 
 ---
@@ -178,16 +212,17 @@ npm run test:e2e   # Playwright（E2Eスモーク）
 
 ## Future Architecture
 
-現在は Vercel ホスティングで運用コストとデプロイ速度を最適化していますが、以下の要件が顕在化した際には AWS への段階的移行を視野に入れています。
+現行の本番データ層は **microCMS**（未設定時のみ `works.json` フォールバック）です。  
+Vercel 上でも `/admin` から CRUD 可能にし、デモモードで検証した UI はそのまま再利用しています。
+
+さらなる要件が顕在化した際には、以下のような段階的移行を視野に入れています。
 
 | フェーズ | 想定構成 | 移行トリガー |
 |---|---|---|
-| **現行** | Vercel + GitHub Actions | 個人ポートフォリオ・低トラフィック |
+| **現行** | Vercel + microCMS + GitHub Actions | 個人ポートフォリオ・低トラフィック |
 | **Phase 1** | S3（静的アセット）+ CloudFront | 画像配信の CDN 最適化・帯域コスト管理 |
 | **Phase 2** | AWS Amplify または ECS/Fargate | 認証基盤の強化・社内 SSO 連携 |
 | **Phase 3** | RDS / DynamoDB + API Gateway | マルチユーザー管理・監査ログ要件 |
-
-特に本番管理画面については、現行のファイルベース永続化（`works.json` + ローカル画像）から、オブジェクトストレージ + メタデータ DB への移行パスを想定しています。デモモードで検証した CRUD フローと UI は、そのまま API 層の差し替え先として再利用可能な設計にしています。
 
 ---
 
@@ -205,10 +240,15 @@ hooks/
   use-gallery-data.ts      # デモ用 CRUD + localStorage 永続化
 lib/
   gallery-view-utils.ts    # hash ナビ・プリロード等（レガシー JS から移植）
-  works-store.ts           # 本番データ層（server-only, sharp）
+  works-store.ts           # 本番データ層 facade（microCMS / local 切替）
+  works-store-local.ts     # works.json + sharp（local フォールバック）
+  microcms-client.ts       # microCMS CRUD + Media API
+  cms-config.ts            # microCMS 設定判定
   gallery-storage.ts       # デモ用 localStorage 層
   gallery-image.ts         # デモ用クライアント画像圧縮
   admin-config.ts          # 認証設定（環境変数）
+scripts/
+  import-works-to-microcms.mjs  # 初回インポート
 proxy.ts                   # 本番管理ルートの認証ガード
 ```
 
@@ -218,3 +258,4 @@ proxy.ts                   # 本番管理ルートの認証ガード
 
 - [AGENT.md](./AGENT.md) — AI 駆動開発の実証記録（レガシー解析・リスクヘッジ・CI/CD 構築プロセス）
 - [gallery-localstorage-implementation-plan.md](./gallery-localstorage-implementation-plan.md) — デモモード実装の詳細計画書
+- [microcms-integration-plan.md](./microcms-integration-plan.md) — microCMS 連携のセットアップ・切替手順

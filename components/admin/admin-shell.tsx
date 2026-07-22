@@ -13,16 +13,24 @@ type AdminShellProps = {
   children: React.ReactNode;
 };
 
-const productionNavItems = [
+type AdminNavItem = {
+  href: string;
+  label: string;
+  openInNewTab?: boolean;
+};
+
+const productionNavItems: AdminNavItem[] = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/works", label: "Works" },
-  { href: "/admin/works/new", label: "New Work" }
+  { href: "/admin/works/new", label: "New Work" },
+  { href: "/", label: "本番確認", openInNewTab: true }
 ];
 
-const demoNavItems = [
+const demoNavItems: AdminNavItem[] = [
   { href: "/demo/admin", label: "Demo Dashboard" },
   { href: "/demo/admin/works", label: "Demo Works" },
-  { href: "/demo/admin/works/new", label: "New Demo Work" }
+  { href: "/demo/admin/works/new", label: "New Demo Work" },
+  { href: "/demo", label: "デモ確認", openInNewTab: true }
 ];
 
 export function AdminShell({
@@ -49,7 +57,14 @@ export function AdminShell({
         ) : null}
         <nav className="adminNav">
           {navItems.map((item) => (
-            <Link key={item.href} href={item.href} className="adminNavLink">
+            <Link
+              key={item.href}
+              href={item.href}
+              className="adminNavLink"
+              {...(item.openInNewTab
+                ? { target: "_blank", rel: "noopener noreferrer" }
+                : {})}
+            >
               {item.label}
             </Link>
           ))}

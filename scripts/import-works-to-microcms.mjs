@@ -6,6 +6,8 @@ import path from "node:path";
 const ROOT = process.cwd();
 const WORKS_JSON = path.join(ROOT, "src/data/works.json");
 const IMAGES_DIR = path.join(ROOT, "public/images/big");
+const REQUEST_INTERVAL_MS = 1000;
+const MAX_RETRIES = 5;
 
 async function loadEnvLocal() {
   try {
@@ -48,11 +50,94 @@ async function parseError(response) {
   }
 }
 
+class HttpError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+function mimeFromFileName(fileName) {
+  switch (path.extname(fileName).toLowerCase()) {
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".png":
+      return "image/png";
+    case ".gif":
+      return "image/gif";
+    case ".webp":
+      return "image/webp";
+    default:
+      throw new Error(`Unsupported image type: ${fileName}`);
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withRetry(label, action) {
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
+    try {
+      return await action();
+    } catch (error) {
+      const retryable =
+        error instanceof HttpError && (error.status === 429 || error.status >= 500);
+
+      if (!retryable || attempt === MAX_RETRIES) {
+        throw error;
+      }
+
+      const waitMs = REQUEST_INTERVAL_MS * 2 ** attempt;
+      console.log(`retry ${attempt}/${MAX_RETRIES} after ${waitMs}ms (${label})`);
+      await sleep(waitMs);
+    }
+  }
+
+  throw new Error(`Unreachable retry state: ${label}`);
+}
+
+async function fetchExistingTitles(serviceDomain, apiKey) {
+  const titles = new Set();
+  let offset = 0;
+  const limit = 100;
+
+  while (true) {
+    const response = await fetch(
+      `https://${serviceDomain}.microcms.io/api/v1/works?limit=${limit}&offset=${offset}&fields=title`,
+      {
+        headers: {
+          "X-MICROCMS-API-KEY": apiKey
+        }
+      }
+    );
+
+    if (!response.ok) {
+      throw new HttpError(response.status, await parseError(response));
+    }
+
+    const body = await response.json();
+    for (const item of body.contents ?? []) {
+      if (item.title) {
+        titles.add(item.title);
+      }
+    }
+
+    offset += limit;
+    if (offset >= (body.totalCount ?? 0)) {
+      break;
+    }
+  }
+
+  return titles;
+}
+
 async function uploadMedia(serviceDomain, apiKey, filePath) {
   const bytes = await readFile(filePath);
   const fileName = path.basename(filePath);
   const formData = new FormData();
-  formData.append("file", new Blob([bytes]), fileName);
+  formData.append("file", new Blob([bytes], { type: mimeFromFileName(fileName) }), fileName);
 
   const response = await fetch(`https://${serviceDomain}.microcms-management.io/api/v1/media`, {
     method: "POST",
@@ -63,7 +148,7 @@ async function uploadMedia(serviceDomain, apiKey, filePath) {
   });
 
   if (!response.ok) {
-    throw new Error(`Media upload failed (${fileName}): ${await parseError(response)}`);
+    throw new HttpError(response.status, `Media upload failed (${fileName}): ${await parseError(response)}`);
   }
 
   const body = await response.json();
@@ -85,12 +170,8 @@ async function createWork(serviceDomain, apiKey, work, imageUrl) {
   });
 
   if (!response.ok) {
-    throw new Error(`Create failed (${work.ttl}): ${await parseError(response)}`);
+    throw new HttpError(response.status, `Create failed (${work.ttl}): ${await parseError(response)}`);
   }
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function main() {
@@ -100,24 +181,35 @@ async function main() {
   const apiKey = requireEnv("MICROCMS_API_KEY");
   const raw = await readFile(WORKS_JSON, "utf-8");
   const works = JSON.parse(raw);
+  const existingTitles = await fetchExistingTitles(serviceDomain, apiKey);
 
-  console.log(`Importing ${works.length} works to microCMS...`);
+  console.log(
+    `Importing ${works.length} works to microCMS (skipping ${existingTitles.size} already imported)...`
+  );
 
   for (const [index, work] of works.entries()) {
     const imagePath = path.join(IMAGES_DIR, work.img);
 
     process.stdout.write(`[${index + 1}/${works.length}] ${work.ttl} ... `);
 
+    if (existingTitles.has(work.ttl)) {
+      console.log("SKIP");
+      continue;
+    }
+
     try {
-      const imageUrl = await uploadMedia(serviceDomain, apiKey, imagePath);
-      await createWork(serviceDomain, apiKey, work, imageUrl);
+      await withRetry(work.ttl, async () => {
+        const imageUrl = await uploadMedia(serviceDomain, apiKey, imagePath);
+        await createWork(serviceDomain, apiKey, work, imageUrl);
+      });
+      existingTitles.add(work.ttl);
       console.log("OK");
     } catch (error) {
       console.log("FAILED");
       throw error;
     }
 
-    await sleep(300);
+    await sleep(REQUEST_INTERVAL_MS);
   }
 
   console.log("Import completed.");
