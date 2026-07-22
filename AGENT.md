@@ -46,25 +46,25 @@
 |---|---|---|
 | `index.html` + `css/`（PC / SP 別） | `app/globals.css` + `components/gallery-view.tsx` | クラス名（`.portfolioHeader` 等）を維持し UI 互換を確保 |
 | UA 判定 → `pc.min.js` / `sp.min.js` 切り替え | `useIsMobile()` + `DesktopGallery` / `MobileGallery` | スクリプト分岐を React コンポーネント分岐へ |
-| `XMLHttpRequest` で `json/data.json` 取得 | `app/page.tsx`（Server Component）→ `readWorks()` | 非同期 fetch をサーバー側ファイル I/O に置換 |
-| `json/data.json` | `src/data/works.json` | データスキーマ（`img` / `ttl` / `charge`）を継承 |
-| `img/{big,small,sp}/` | `public/images/{big,small,sp}/` | 3 サイズ画像パスの構造を維持 |
+| `XMLHttpRequest` で `json/data.json` 取得 | `app/page.tsx`（Server Component）→ `readWorks()` | 非同期 fetch をサーバー側データ層に置換（microCMS / local 切替） |
+| `json/data.json` | `src/data/works.json`（local フォールバック）+ microCMS | スキーマ（`img` / `ttl` / `charge` ↔ `title` / `charge` / `image`）を継承 |
+| `img/{big,small,sp}/` | `public/images/{big,small,sp}/` または microCMS CDN | local は 3 サイズ維持、microCMS は CDN クエリでリサイズ |
 | `location.hash` + `convertHashIndex()` | `lib/gallery-view-utils.ts`（`parseHash` / `updateHash`） | ブラウザ API 依存 → `"use client"` 配下 |
 | `window.onhashchange` | `gallery-view.tsx` の `useEffect` + `hashchange` リスナー | イベント登録・解除を React ライフサイクルに統合 |
 | `setInterval` によるサムネイル横スクロール（`pc.min.js`） | `gallery-view.tsx` の `requestAnimationFrame` + ref | 描画ループをモダン API に置換 |
 | Swiper.js スライドギャラリー（`sp.min.js`） | `MobileGallery`（タッチスワイプ） | 外部ライブラリ依存を React ネイティブ操作へ |
 | `Image()` によるプリロード進捗 | `preloadImages()` in `gallery-view-utils.ts` | ローディング UI ロジックを純関数として切り出し |
 | HTML エンティティの手動デコード | `decodeHtml()` in `gallery-view-utils.ts` | SSR/CSR 両対応のユーティリティ化（ハイドレーション不一致を修正） |
-| （移行先で新規）本番管理 CRUD | `/admin/**` → Server Actions + `lib/works-store.ts`（sharp） | サーバー永続化・画像バリアント生成 |
+| （移行先で新規）本番管理 CRUD | `/admin/**` → Server Actions + `works-store.ts`（microCMS / local） | UI・認証は維持し、永続化先だけ切替 |
 | （移行先で新規）デモ向け CRUD | `/demo/admin/**` → `useGalleryData` + `gallery-storage.ts` | クライアントのみ永続化（本番汚染防止） |
 
 ### Client / Server Component の切り分け判断
 
 | 処理 | 配置 | 理由 |
 |---|---|---|
-| `readWorks()` / `works.json` 読み込み | Server Component（`app/page.tsx`） | ファイル I/O はサーバー専用。クライアントバンドルに含めない |
+| `readWorks()`（microCMS / `works.json`） | Server Component（`app/page.tsx`） | API キーとファイル I/O はサーバー専用 |
 | ギャラリー表示・hash ナビ・マウス追従 | Client Component（`gallery-view.tsx`） | `window` / `history` / `requestAnimationFrame` 依存 |
-| 本番画像アップロード・バリアント生成 | Server Actions + `works-store.ts`（`server-only`） | sharp は Node.js 専用 |
+| 本番 CRUD・画像アップロード | Server Actions + `works-store.ts`（`server-only`） | microCMS Media API / sharp は Node.js 専用 |
 | デモ CRUD・localStorage 永続化 | Client Hook（`use-gallery-data.ts`） | ブラウザストレージはクライアント専用 |
 | 本番管理の認証ガード | `proxy.ts` | `/admin` 配下への Cookie セッション検証 |
 
@@ -106,7 +106,7 @@ AI と共に以下を実装しました。
 |---|---|
 | 初期シード件数: 10 → **20** | デモ体験で十分な作品数を確保するため。localStorage 容量とのトレードオフを認識したうえで決定 |
 | 圧縮横幅: 1000px → **720px** | 20 件 × Base64 でも 5MB 内に収まるよう、面積比（幅の二乗）で容量を試算 |
-| 本番との分離確認 | 本番は sharp で 1600px 生成、デモは 720px — 用途ごとに最適化が異なることを明示 |
+| 本番との分離確認 | 本番は microCMS CDN（local 時は sharp 1600px）、デモは 720px — 用途ごとに最適化が異なることを明示 |
 | シード件数が反映されない | localStorage の既存データが原因と人間が切り分け。ストレージキーのバージョン管理（`portfolio_admin_gallery_demo_v1`）で対応 |
 
 ### Step 4 — 認証のリスクヘッジ（人間）
@@ -116,6 +116,42 @@ AI と共に以下を実装しました。
 - [x] ハードコードされたフォールバック値を削除
 - [x] 環境変数未設定時はログイン無効化
 - [x] `.env.example` のみをリポジトリに含める
+
+### Step 5 — Vercel 読み取り専用 FS への対応（人間 ↔ AI）
+
+> 本番（Vercel）で `/admin` の更新が `EROFS: read-only file system` になる。  
+> 自作管理 UI は残したまま、永続化先だけ差し替えよ（パターン B）。
+
+**人間の判断**
+
+| 判断 | 内容 |
+|---|---|
+| 方針 | UI / 認証 / デモモードは維持。本番データ層のみ microCMS へ |
+| 切替条件 | `MICROCMS_SERVICE_DOMAIN` + `MICROCMS_API_KEY` あり → microCMS、なし → `works.json` + sharp |
+| スキーマ | API ID `works` / `title`・`charge`・`image`（アプリ側 `ttl` / `charge` / `img` と対応） |
+| 運用 | Vercel Environment Variables（Production）に同キーを設定。追加後は Redeploy が必要 |
+
+**AI が実装した層**
+
+| ファイル | 役割 |
+|---|---|
+| `lib/cms-config.ts` | 設定有無判定・Storage ラベル（`microCMS` / `works.json`） |
+| `lib/microcms-client.ts` | Contents API CRUD + Media API アップロード |
+| `lib/microcms-image.ts` | CDN リサイズ URL（`?w=`） |
+| `lib/works-store.ts` | facade（環境変数で local / microCMS 切替） |
+| `lib/works-store-local.ts` | 従来のファイル永続化 + Vercel 上での書き込み拒否 |
+| `scripts/import-works-to-microcms.mjs` | 初回インポート（MIME 指定・429 リトライ・既存タイトル SKIP） |
+
+**検証で潰したポイント**
+
+| 症状 | 原因 | 対処 |
+|---|---|---|
+| Media upload `Forbidden` | API キーにメディア権限なし | マネジメント API（ベータ）で「メディアのアップロード」を許可 |
+| `application/octet-stream` 拒否 | Blob に MIME 未指定 | 拡張子から `image/jpeg` 等を付与 |
+| `Too Many Requests` | 連続アップロード | 間隔延長 + 指数バックオフ + 再開時 SKIP |
+| 本番だけ EROFS のまま | 環境変数追加後未 Redeploy / `main` 未反映 | Production 再デプロイと Storage=`microCMS` で確認 |
+
+デモ（`/demo` / `/demo/admin`）は localStorage のまま変更なし。詳細手順は [microcms-integration-plan.md](./microcms-integration-plan.md)。
 
 ---
 
@@ -161,10 +197,11 @@ AI と共に以下を実装しました。
 | 領域 | 具体的な判断・作業 |
 |---|---|
 | **移行方針** | レガシー UI 互換の優先度、Client / Server 境界、新規機能（管理・デモ）のスコープ |
-| **アーキテクチャ設計** | 本番（`/admin`）とデモ（`/demo/admin`）の URL 分離。サーバー永続化とクライアント永続化の責務分界 |
-| **UI/UX 決定** | デモ管理の固定ヘッダー、リセット動線、サイトタイトル編集フォームの配置 |
-| **セキュリティ・運用リスク** | 本番 ID/PW の環境変数化、`.env.local` の Git 除外、デモでの認証不要設計 |
+| **アーキテクチャ設計** | 本番（`/admin`）とデモ（`/demo/admin`）の URL 分離。microCMS / local / localStorage の責務分界 |
+| **UI/UX 決定** | デモ管理の固定ヘッダー、リセット動線、サイトタイトル編集、管理ナビの本番確認リンク |
+| **セキュリティ・運用リスク** | 本番 ID/PW・microCMS キーの環境変数化、`.env.local` の Git 除外、デモでの認証不要設計 |
 | **容量制約への対策** | localStorage 5MB 上限を前提とした画像圧縮仕様（横幅・品質・初期件数）の決定 |
+| **ホスティング制約への対策** | Vercel 読み取り専用 FS を前提に microCMS（パターン B）を採用 |
 | **品質担保** | CI ゲートの定義、ビルド確認、デモと本番の表示一致確認、コミット前の秘密情報チェック |
 
 ### AI の役割
@@ -174,21 +211,21 @@ AI と共に以下を実装しました。
 | **レガシー翻訳** | Vanilla JS の DOM 操作・イベント処理を React コンポーネント / フックへ変換 |
 | **コーディング** | App Router ルート、Server Actions、クライアントコンポーネントの実装 |
 | **コンポーネント設計** | `gallery-view.tsx` への UI 共通化、`AdminGalleryProvider` / `useGalleryData` の実装 |
-| **画像処理** | `compressImageToDataUrl()`（Canvas API）、本番側 `sharp` バリアント生成 |
-| **ストレージ層** | `gallery-storage.ts` の read/write/seed/reset、`QuotaExceededError` ハンドリング |
+| **画像処理** | `compressImageToDataUrl()`（Canvas API）、local 側 `sharp`、microCMS Media API |
+| **ストレージ層** | `gallery-storage.ts`、`works-store` facade、microCMS クライアント、初回 migrate スクリプト |
 | **認証まわり** | `proxy.ts`、Cookie セッション、環境変数ベースの `admin-config.ts` |
 | **CI / テスト** | GitHub Actions ワークフロー、Vitest / Playwright テストの整備 |
-| **デバッグ** | SSR/CSR ハイドレーション不一致（`decodeHtml`）の修正、ビルドエラーの解消 |
+| **デバッグ** | ハイドレーション不一致、Vercel EROFS、Media API 権限・MIME・レート制限の切り分け |
 
 ---
 
 ## プロンプト設計の原則（本プロジェクトで実践したこと）
 
-1. **制約を先に渡す** — 「何ができないか」（5MB、本番汚染禁止）を機能要件より先に書く
+1. **制約を先に渡す** — 「何ができないか」（5MB、本番汚染禁止、Vercel 読み取り専用 FS）を機能要件より先に書く
 2. **数値で指示する** — 「小さく圧縮」ではなく「横幅 720px、JPEG 70%」
-3. **責務の境界を明示する** — 「デモはクライアントのみ」「本番は Server Actions + sharp」
-4. **レビュー単位を小さくする** — レガシー翻訳 → URL 分離 → localStorage 化 → UI 共通化 → 認証分離 → CI 整備
-5. **AI の出力を盲信しない** — 表示不一致・シード件数の問題は、人間が原因を切り分けてから再指示
+3. **責務の境界を明示する** — 「デモはクライアントのみ」「本番 UI は維持しデータ層だけ差し替え」
+4. **レビュー単位を小さくする** — レガシー翻訳 → URL 分離 → localStorage 化 → 認証 → CI → microCMS
+5. **AI の出力を盲信しない** — 表示不一致・シード件数・本番 EROFS は、人間が原因を切り分けてから再指示
 
 ---
 
@@ -200,8 +237,9 @@ AI と共に以下を実装しました。
 - [x] 本番・デモを URL で完全分離したサンドボックス構成
 - [x] 本番を汚さず CRUD を検証できるデモモード
 - [x] 環境変数ベースの本番認証（秘密情報の非公開化）
+- [x] Vercel 向け microCMS 連携（自作 `/admin` 維持・local フォールバック）
 - [x] GitHub Actions による CI/CD（Lint / 型検査 / Vitest / Playwright）
-- [x] 実装計画書（`gallery-localstorage-implementation-plan.md`）— 要件からタスク分解まで文書化
+- [x] 実装計画書（`gallery-localstorage-implementation-plan.md` / `microcms-integration-plan.md`）
 
 ### 学び
 
@@ -209,13 +247,15 @@ AI と共に以下を実装しました。
 |---|---|
 | **レガシー移行** | AI は翻訳速度を上げるが、Client / Server 境界の判断は人間の責務。制約を先に渡すほど移行品質が上がる |
 | **AI との協業** | 要件の粒度が実装品質を決める。エッジケースを人間が先に列挙するほど、AI の出力は実用に耐える |
-| **制約駆動設計** | localStorage 5MB という制約が、クライアント画像圧縮という合理的な設計判断を生んだ |
+| **制約駆動設計** | localStorage 5MB と Vercel 読み取り専用 FS が、圧縮仕様と microCMS 切替という設計判断を生んだ |
 | **分離の価値** | デモと本番の URL / データ層 / 画像処理の分離により、それぞれ独立してチューニング可能 |
+| **データ層の差し替え** | UI を残して永続化先だけ差し替えると、デモで検証した CRUD 体験を本番へ再利用しやすい |
 | **品質の自動化** | リプレイス直後こそ CI ゲートが効く。ロジック層とブラウザ層でテストを分担すると保守しやすい |
 
 ---
 
 ## 関連ドキュメント
 
-- [README.md](./README.md) — プロジェクト概要・技術スタック・CI/CD
+- [README.md](./README.md) — プロジェクト概要・技術スタック・CI/CD・microCMS セットアップ
 - [gallery-localstorage-implementation-plan.md](./gallery-localstorage-implementation-plan.md) — デモモード実装の詳細計画書
+- [microcms-integration-plan.md](./microcms-integration-plan.md) — microCMS 連携のセットアップ・切替手順
