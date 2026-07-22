@@ -1,104 +1,30 @@
 import "server-only";
 
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
-import path from "node:path";
-import sharp from "sharp";
+import { isMicroCmsConfigured } from "@/lib/cms-config";
+import {
+  createWorkInMicroCms,
+  deleteWorkFromMicroCms,
+  readWorksFromMicroCms,
+  updateWorkInMicroCms
+} from "@/lib/microcms-client";
+import {
+  createWorkInLocal,
+  deleteWorkFromLocal,
+  readWorksFromLocal,
+  updateWorkInLocal
+} from "@/lib/works-store-local";
 import type { WorkItem } from "@/lib/works";
-
-const dataFilePath = path.join(process.cwd(), "src/data/works.json");
-const imagesRoot = path.join(process.cwd(), "public/images");
-
-export async function readWorks(): Promise<WorkItem[]> {
-  const raw = await readFile(dataFilePath, "utf-8");
-  return JSON.parse(raw) as WorkItem[];
-}
-
-export async function writeWorks(works: WorkItem[]) {
-  await writeFile(dataFilePath, `${JSON.stringify(works, null, 2)}\n`, "utf-8");
-}
-
-function slugifyFileName(value: string) {
-  return value
-    .normalize("NFKD")
-    .replace(/[^\w\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-")
-    .toLowerCase();
-}
-
-function htmlEscape(value: string) {
-  return value.replaceAll("&", "&amp;");
-}
 
 export function htmlUnescape(value: string) {
   return value.replaceAll("&amp;", "&");
 }
 
-function getNextImageNumber(works: WorkItem[]) {
-  const max = works.reduce((currentMax, work) => {
-    const matched = work.img.match(/^(\d+)/);
-    const value = matched ? Number.parseInt(matched[1], 10) : 0;
-    return Math.max(currentMax, value);
-  }, 0);
-
-  return max + 1;
-}
-
-async function ensureImageDirectories() {
-  await Promise.all(
-    ["big", "small", "sp"].map((dir) =>
-      mkdir(path.join(imagesRoot, dir), { recursive: true })
-    )
-  );
-}
-
-async function createImageVariants(fileName: string, bytes: Buffer) {
-  const image = sharp(bytes, { failOn: "none" });
-  const metadata = await image.metadata();
-  const isPng = metadata.format === "png";
-
-  const bigOutput = path.join(imagesRoot, "big", fileName);
-  const smallOutput = path.join(imagesRoot, "small", fileName);
-  const spOutput = path.join(imagesRoot, "sp", fileName);
-
-  if (isPng) {
-    await Promise.all([
-      image
-        .clone()
-        .resize({ width: 1600, withoutEnlargement: true })
-        .png()
-        .toFile(bigOutput),
-      image
-        .clone()
-        .resize(320, 180, { fit: "cover", position: "centre" })
-        .png()
-        .toFile(smallOutput),
-      image
-        .clone()
-        .resize({ width: 1200, withoutEnlargement: true })
-        .png()
-        .toFile(spOutput)
-    ]);
-    return;
+export async function readWorks(): Promise<WorkItem[]> {
+  if (isMicroCmsConfigured()) {
+    return readWorksFromMicroCms();
   }
 
-  await Promise.all([
-    image
-      .clone()
-      .resize({ width: 1600, withoutEnlargement: true })
-      .jpeg({ quality: 90 })
-      .toFile(bigOutput),
-    image
-      .clone()
-      .resize(320, 180, { fit: "cover", position: "centre" })
-      .jpeg({ quality: 86 })
-      .toFile(smallOutput),
-    image
-      .clone()
-      .resize({ width: 1200, withoutEnlargement: true })
-      .jpeg({ quality: 88 })
-      .toFile(spOutput)
-  ]);
+  return readWorksFromLocal();
 }
 
 export async function createWork(input: {
@@ -106,52 +32,29 @@ export async function createWork(input: {
   charge: string;
   imageFile: File;
 }) {
-  const works = await readWorks();
-  const nextNumber = getNextImageNumber(works);
-  const ext = path.extname(input.imageFile.name).toLowerCase();
-  const safeExt = ext === ".png" ? ".png" : ".jpg";
-  const slug = slugifyFileName(input.title) || "work";
-  const paddedNumber = String(nextNumber).padStart(2, "0");
-  const fileName = `${paddedNumber}_${slug}${safeExt}`;
+  if (isMicroCmsConfigured()) {
+    await createWorkInMicroCms(input);
+    return;
+  }
 
-  await ensureImageDirectories();
-  const arrayBuffer = await input.imageFile.arrayBuffer();
-  const bytes = Buffer.from(arrayBuffer);
-  await createImageVariants(fileName, bytes);
-
-  works.push({
-    ttl: htmlEscape(input.title),
-    charge: htmlEscape(input.charge),
-    img: fileName
-  });
-
-  await writeWorks(works);
+  await createWorkInLocal(input);
 }
 
 export async function deleteWorkByImageName(imageName: string) {
-  const works = await readWorks();
-  const nextWorks = works.filter((work) => work.img !== imageName);
-
-  if (nextWorks.length === works.length) {
-    return false;
+  if (isMicroCmsConfigured()) {
+    throw new Error("deleteWorkByImageName is not supported for microCMS. Use deleteWorkById.");
   }
 
-  await writeWorks(nextWorks);
+  return deleteWorkFromLocal(imageName);
+}
 
-  await Promise.all(
-    ["big", "small", "sp"].map(async (dir) => {
-      const filePath = path.join(imagesRoot, dir, imageName);
-      try {
-        await unlink(filePath);
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-          throw error;
-        }
-      }
-    })
-  );
+export async function deleteWorkById(id: string) {
+  if (isMicroCmsConfigured()) {
+    await deleteWorkFromMicroCms(id);
+    return true;
+  }
 
-  return true;
+  throw new Error("deleteWorkById requires microCMS configuration.");
 }
 
 export async function updateWorkByImageName(input: {
@@ -159,19 +62,22 @@ export async function updateWorkByImageName(input: {
   title: string;
   charge: string;
 }) {
-  const works = await readWorks();
-  const targetIndex = works.findIndex((work) => work.img === input.imageName);
-
-  if (targetIndex === -1) {
-    return false;
+  if (isMicroCmsConfigured()) {
+    throw new Error("updateWorkByImageName is not supported for microCMS. Use updateWorkById.");
   }
 
-  works[targetIndex] = {
-    ...works[targetIndex],
-    ttl: htmlEscape(input.title),
-    charge: htmlEscape(input.charge)
-  };
+  return updateWorkInLocal(input);
+}
 
-  await writeWorks(works);
-  return true;
+export async function updateWorkById(input: {
+  id: string;
+  title: string;
+  charge: string;
+}) {
+  if (isMicroCmsConfigured()) {
+    await updateWorkInMicroCms(input);
+    return true;
+  }
+
+  throw new Error("updateWorkById requires microCMS configuration.");
 }

@@ -6,6 +6,7 @@ export type GalleryViewItem = {
   charge: string;
   key?: string;
   previewUrl?: string;
+  imageUrl?: string;
 };
 
 const HTML_ENTITIES: Record<string, string> = {
@@ -85,7 +86,13 @@ export function formatChargeForMobile(charge: string) {
   return decoded.replace(/■/g, "\n■").trim();
 }
 
+import { getMicroCmsImageSrc } from "@/lib/microcms-image";
+
 export function getDefaultImageSrc(item: GalleryViewItem, size: GalleryImageSize) {
+  if (item.imageUrl) {
+    return getMicroCmsImageSrc(item.imageUrl, size);
+  }
+
   return `/images/${size}/${item.img}`;
 }
 

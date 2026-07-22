@@ -1,17 +1,19 @@
 import Link from "next/link";
 import { AdminNavButton } from "@/components/admin/admin-nav-button";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { getWorksStorageLabel, isMicroCmsConfigured } from "@/lib/cms-config";
 import { getAdminWorks } from "@/lib/admin-works";
 
 export default async function AdminDashboardPage() {
   const adminWorks = await getAdminWorks();
   const latestWorks = adminWorks.slice(0, 3);
+  const storageLabel = getWorksStorageLabel();
+  const storageDescription = isMicroCmsConfigured()
+    ? "公開ギャラリーの管理画面です。変更は microCMS API 経由で反映されます。"
+    : "公開ギャラリーの管理画面です。変更は works.json と画像ファイルに反映されます。";
 
   return (
-    <AdminShell
-      title="Dashboard"
-      description="公開ギャラリーの管理画面です。変更は works.json と画像ファイルに反映されます。"
-    >
+    <AdminShell title="Dashboard" description={storageDescription}>
       <section className="adminStatsGrid">
         <article className="adminStatCard">
           <span className="adminStatLabel">Works</span>
@@ -23,7 +25,7 @@ export default async function AdminDashboardPage() {
         </article>
         <article className="adminStatCard">
           <span className="adminStatLabel">Storage</span>
-          <strong className="adminStatValue">works.json</strong>
+          <strong className="adminStatValue">{storageLabel}</strong>
         </article>
       </section>
 

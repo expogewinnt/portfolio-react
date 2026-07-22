@@ -10,7 +10,7 @@ export async function getAdminWorks(): Promise<AdminWork[]> {
 
   return [...works].reverse().map((work, index) => ({
     ...work,
-    id: `work-${String(index + 1).padStart(3, "0")}`
+    id: work.id ?? `work-${String(index + 1).padStart(3, "0")}`
   }));
 }
 

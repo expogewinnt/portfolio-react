@@ -10,6 +10,7 @@ import {
 } from "@/app/admin/actions";
 import { ConfirmDeleteButton } from "@/components/admin/confirm-delete-button";
 import type { AdminWork } from "@/lib/admin-works";
+import { getAdminWorkPreviewSrc } from "@/lib/admin-work-image";
 import { htmlUnescape } from "@/lib/gallery-utils";
 
 type WorkEditorFormProps = {
@@ -95,7 +96,7 @@ export function WorkEditorForm({ mode, work }: WorkEditorFormProps) {
             {work ? (
               <>
                 <img
-                  src={`/images/small/${work.img}`}
+                  src={getAdminWorkPreviewSrc(work)}
                   alt={htmlUnescape(work.ttl)}
                   className="adminPreviewImage"
                 />

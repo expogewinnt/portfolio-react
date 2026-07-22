@@ -4,6 +4,7 @@ import { deleteWorkAction } from "@/app/admin/actions";
 import { AdminNavButton } from "@/components/admin/admin-nav-button";
 import { ConfirmDeleteButton } from "@/components/admin/confirm-delete-button";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { getAdminWorkPreviewSrc } from "@/lib/admin-work-image";
 import { getAdminWorks } from "@/lib/admin-works";
 
 export default async function AdminWorksPage() {
@@ -25,7 +26,7 @@ export default async function AdminWorksPage() {
                 {String(adminWorks.length - index).padStart(3, "0")}
               </div>
               <div className="adminTableThumb">
-                <img src={`/images/small/${work.img}`} alt={work.ttl} />
+                <img src={getAdminWorkPreviewSrc(work)} alt={work.ttl} />
               </div>
               <div className="adminTableBody">
                 <p className="adminListTitle">{work.ttl}</p>

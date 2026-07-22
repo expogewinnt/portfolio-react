@@ -3,7 +3,15 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ADMIN_SESSION_COOKIE, getAdminConfig, getAdminSetupMessage } from "@/lib/admin-config";
-import { createWork, deleteWorkByImageName, updateWorkByImageName } from "@/lib/works-store";
+import { isMicroCmsConfigured } from "@/lib/cms-config";
+import { MicroCmsError } from "@/lib/microcms-client";
+import {
+  createWork,
+  deleteWorkById,
+  deleteWorkByImageName,
+  updateWorkById,
+  updateWorkByImageName
+} from "@/lib/works-store";
 import { getAdminWorkById } from "@/lib/admin-works";
 
 export type LoginState = {
@@ -13,6 +21,18 @@ export type LoginState = {
 export type WorkFormState = {
   error?: string;
 };
+
+function toWorkFormError(error: unknown): string {
+  if (error instanceof MicroCmsError) {
+    return `microCMS への保存に失敗しました: ${error.message}`;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "保存に失敗しました。";
+}
 
 export async function loginAction(
   _prevState: LoginState,
@@ -71,7 +91,12 @@ export async function createWorkAction(
     return { error: "画像ファイルを選択してください。" };
   }
 
-  await createWork({ title, charge, imageFile });
+  try {
+    await createWork({ title, charge, imageFile });
+  } catch (error) {
+    return { error: toWorkFormError(error) };
+  }
+
   redirect("/admin/works");
 }
 
@@ -83,7 +108,20 @@ export async function deleteWorkAction(formData: FormData) {
     redirect("/admin/works");
   }
 
-  await deleteWorkByImageName(work.img);
+  try {
+    if (isMicroCmsConfigured()) {
+      if (!work.id) {
+        redirect("/admin/works");
+      }
+      await deleteWorkById(work.id);
+    } else {
+      await deleteWorkByImageName(work.img);
+    }
+  } catch (error) {
+    console.error(error);
+    redirect("/admin/works");
+  }
+
   redirect("/admin/works");
 }
 
@@ -108,11 +146,27 @@ export async function updateWorkAction(
     return { error: "Credit は必須です。" };
   }
 
-  await updateWorkByImageName({
-    imageName: work.img,
-    title,
-    charge
-  });
+  try {
+    if (isMicroCmsConfigured()) {
+      if (!work.id) {
+        return { error: "microCMS の作品 ID が取得できません。" };
+      }
+
+      await updateWorkById({
+        id: work.id,
+        title,
+        charge
+      });
+    } else {
+      await updateWorkByImageName({
+        imageName: work.img,
+        title,
+        charge
+      });
+    }
+  } catch (error) {
+    return { error: toWorkFormError(error) };
+  }
 
   redirect(`/admin/works/${id}`);
 }

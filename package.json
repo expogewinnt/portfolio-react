@@ -12,7 +12,8 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "migrate:microcms": "node scripts/import-works-to-microcms.mjs"
   },
   "dependencies": {
     "next": "^16.0.1",

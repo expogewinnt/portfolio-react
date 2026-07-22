@@ -1,4 +1,5 @@
 import { DEMO_WORKS_LIMIT } from "@/lib/gallery-constants";
+import { getMicroCmsImageSrc } from "@/lib/microcms-image";
 import { parseSiteTitleLines, sanitizeSiteTitle } from "@/lib/site-title-utils";
 import type { WorkItem } from "@/lib/works";
 
@@ -34,7 +35,15 @@ export function ensureWorkIds(works: AdminGalleryItem[]): AdminGalleryItem[] {
 }
 
 export function getWorkImageSrc(work: AdminGalleryItem) {
-  return work.previewUrl ?? `/images/small/${work.img}`;
+  if (work.previewUrl) {
+    return work.previewUrl;
+  }
+
+  if (work.imageUrl) {
+    return getMicroCmsImageSrc(work.imageUrl, "small");
+  }
+
+  return `/images/small/${work.img}`;
 }
 
 export function formatCopyright(siteTitle: string, year: number) {
