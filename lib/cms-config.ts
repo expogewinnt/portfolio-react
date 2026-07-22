@@ -1,17 +1,16 @@
-const MICROCMS_ENV_KEYS = ["MICROCMS_SERVICE_DOMAIN", "MICROCMS_API_KEY"] as const;
-
-function readEnv(name: (typeof MICROCMS_ENV_KEYS)[number]) {
-  const value = process.env[name]?.trim();
-  return value ? value : null;
+function readTrimmed(value: string | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }
 
 export function isMicroCmsConfigured() {
-  return MICROCMS_ENV_KEYS.every((key) => readEnv(key) !== null);
+  return getMicroCmsConfig() !== null;
 }
 
 export function getMicroCmsConfig() {
-  const serviceDomain = readEnv("MICROCMS_SERVICE_DOMAIN");
-  const apiKey = readEnv("MICROCMS_API_KEY");
+  // Next.js / Vercel では process.env.NAME の静的参照が安全
+  const serviceDomain = readTrimmed(process.env.MICROCMS_SERVICE_DOMAIN);
+  const apiKey = readTrimmed(process.env.MICROCMS_API_KEY);
 
   if (!serviceDomain || !apiKey) {
     return null;

@@ -93,7 +93,16 @@ export async function readWorksFromLocal(): Promise<WorkItem[]> {
   return JSON.parse(raw) as WorkItem[];
 }
 
+function assertLocalWritesAllowed() {
+  if (process.env.VERCEL) {
+    throw new Error(
+      "Vercel 上では works.json へ書き込めません。MICROCMS_SERVICE_DOMAIN / MICROCMS_API_KEY を設定し、Redeploy してください。"
+    );
+  }
+}
+
 async function writeWorksToLocal(works: WorkItem[]) {
+  assertLocalWritesAllowed();
   await writeFile(dataFilePath, `${JSON.stringify(works, null, 2)}\n`, "utf-8");
 }
 
@@ -102,6 +111,7 @@ export async function createWorkInLocal(input: {
   charge: string;
   imageFile: File;
 }) {
+  assertLocalWritesAllowed();
   const works = await readWorksFromLocal();
   const nextNumber = getNextImageNumber(works);
   const ext = path.extname(input.imageFile.name).toLowerCase();
@@ -125,6 +135,7 @@ export async function createWorkInLocal(input: {
 }
 
 export async function deleteWorkFromLocal(imageName: string) {
+  assertLocalWritesAllowed();
   const works = await readWorksFromLocal();
   const nextWorks = works.filter((work) => work.img !== imageName);
 
@@ -155,6 +166,7 @@ export async function updateWorkInLocal(input: {
   title: string;
   charge: string;
 }) {
+  assertLocalWritesAllowed();
   const works = await readWorksFromLocal();
   const targetIndex = works.findIndex((work) => work.img === input.imageName);
 
