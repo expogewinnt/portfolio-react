@@ -144,6 +144,38 @@ export function useGalleryData(initialWorks: WorkItem[]) {
     [persist, siteTitle, works]
   );
 
+  const reorderWorks = useCallback(
+    (orderedIds: string[]) => {
+      setError(null);
+
+      try {
+        const byId = new Map(works.map((work) => [work.id, work]));
+        if (orderedIds.length !== works.length) {
+          setError("並び替え対象の件数が一致しません。");
+          return false;
+        }
+
+        const nextWorks = orderedIds.map((id) => {
+          const work = byId.get(id);
+          if (!work) {
+            throw new Error(`並び替え対象が見つかりません: ${id}`);
+          }
+          return work;
+        });
+
+        persist({
+          works: nextWorks,
+          siteTitle
+        });
+        return true;
+      } catch {
+        setError("並び替えに失敗しました。");
+        return false;
+      }
+    },
+    [persist, siteTitle, works]
+  );
+
   const resetToInitial = useCallback(() => {
     setError(null);
     const state = resetGalleryStorage(initialWorks);
@@ -162,6 +194,7 @@ export function useGalleryData(initialWorks: WorkItem[]) {
     createWork,
     updateWork,
     deleteWork,
+    reorderWorks,
     resetToInitial
   };
 }

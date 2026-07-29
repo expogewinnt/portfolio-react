@@ -1,18 +1,21 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ADMIN_SESSION_COOKIE, getAdminConfig, getAdminSetupMessage } from "@/lib/admin-config";
+import { getAdminWorkById, getAdminWorks } from "@/lib/admin-works";
 import { isMicroCmsConfigured } from "@/lib/cms-config";
 import { MicroCmsError } from "@/lib/microcms-client";
+import { adminOrderToGalleryOrder, reorderByIds } from "@/lib/works-order";
 import {
   createWork,
   deleteWorkById,
   deleteWorkByImageName,
+  reorderWorks,
   updateWorkById,
   updateWorkByImageName
 } from "@/lib/works-store";
-import { getAdminWorkById } from "@/lib/admin-works";
 
 export type LoginState = {
   error?: string;
@@ -169,4 +172,24 @@ export async function updateWorkAction(
   }
 
   redirect(`/admin/works/${id}`);
+}
+
+export async function reorderWorksAction(orderedIds: string[]): Promise<WorkFormState> {
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+    return { error: "並び替え対象が空です。" };
+  }
+
+  try {
+    const adminWorks = await getAdminWorks();
+    const orderedAdminWorks = reorderByIds(adminWorks, orderedIds);
+    const galleryOrderedWorks = adminOrderToGalleryOrder(orderedAdminWorks);
+    await reorderWorks(galleryOrderedWorks);
+  } catch (error) {
+    return { error: toWorkFormError(error) };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/admin/works");
+  return {};
 }

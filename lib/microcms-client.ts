@@ -17,6 +17,7 @@ type MicroCmsWorkContent = {
   title: string;
   charge: string;
   image: MicroCmsImage;
+  order?: number;
   publishedAt?: string;
   revisedAt?: string;
 };
@@ -57,8 +58,28 @@ function toWorkItem(content: MicroCmsWorkContent): WorkItem {
     ttl: content.title,
     charge: content.charge,
     img: imageUrl ? imageUrl.split("/").at(-1) ?? content.id : content.id,
-    imageUrl
+    imageUrl,
+    sortOrder: typeof content.order === "number" ? content.order : undefined
   };
+}
+
+function sortMicroCmsContents(contents: MicroCmsWorkContent[]) {
+  return [...contents].sort((a, b) => {
+    const aOrder = a.order;
+    const bOrder = b.order;
+    const aHasOrder = typeof aOrder === "number";
+    const bHasOrder = typeof bOrder === "number";
+
+    if (aHasOrder && bHasOrder && aOrder !== bOrder) {
+      return aOrder - bOrder;
+    }
+
+    if (aHasOrder !== bHasOrder) {
+      return aHasOrder ? -1 : 1;
+    }
+
+    return (a.publishedAt ?? "").localeCompare(b.publishedAt ?? "");
+  });
 }
 
 async function parseErrorResponse(response: Response) {
@@ -117,15 +138,25 @@ async function uploadMedia(file: File) {
 
 export async function readWorksFromMicroCms(): Promise<WorkItem[]> {
   const response = await microCmsRequest<MicroCmsListResponse>(
-    `/${WORKS_ENDPOINT}?limit=${WORKS_LIMIT}&orders=publishedAt`
+    `/${WORKS_ENDPOINT}?limit=${WORKS_LIMIT}&orders=order,publishedAt`
   );
 
-  return response.contents.map(toWorkItem);
+  return sortMicroCmsContents(response.contents).map(toWorkItem);
 }
 
 export async function getWorkFromMicroCms(id: string) {
   const content = await microCmsRequest<MicroCmsWorkContent>(`/${WORKS_ENDPOINT}/${id}`);
   return toWorkItem(content);
+}
+
+async function getNextSortOrder() {
+  const works = await readWorksFromMicroCms();
+  // order 未設定の既存データは、現在のギャラリー順の位置を仮の番号として扱う
+  const maxOrder = works.reduce((max, work, index) => {
+    return Math.max(max, work.sortOrder ?? index + 1);
+  }, works.length);
+
+  return maxOrder + 1;
 }
 
 export async function createWorkInMicroCms(input: {
@@ -134,18 +165,43 @@ export async function createWorkInMicroCms(input: {
   imageFile: File;
 }) {
   const imageUrl = await uploadMedia(input.imageFile);
+  const order = await getNextSortOrder();
+  const baseContent = {
+    title: htmlEscape(input.title),
+    charge: htmlEscape(input.charge),
+    image: imageUrl
+  };
 
-  await microCmsRequest<MicroCmsWorkContent>(`/${WORKS_ENDPOINT}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      title: htmlEscape(input.title),
-      charge: htmlEscape(input.charge),
-      image: imageUrl
-    })
-  });
+  try {
+    await microCmsRequest<MicroCmsWorkContent>(`/${WORKS_ENDPOINT}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        ...baseContent,
+        order
+      })
+    });
+  } catch (error) {
+    // order フィールド未作成のサービス向けフォールバック
+    if (
+      error instanceof MicroCmsError &&
+      /order/i.test(error.message) &&
+      /unexpected key/i.test(error.message)
+    ) {
+      await microCmsRequest<MicroCmsWorkContent>(`/${WORKS_ENDPOINT}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(baseContent)
+      });
+      return;
+    }
+
+    throw error;
+  }
 }
 
 export async function updateWorkInMicroCms(input: {
@@ -163,6 +219,67 @@ export async function updateWorkInMicroCms(input: {
       charge: htmlEscape(input.charge)
     })
   });
+}
+
+async function runWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>
+) {
+  let index = 0;
+
+  async function runNext(): Promise<void> {
+    while (index < items.length) {
+      const current = index;
+      index += 1;
+      await worker(items[current]);
+    }
+  }
+
+  const runners = Array.from({ length: Math.min(concurrency, items.length) }, () => runNext());
+  await Promise.all(runners);
+}
+
+export async function reorderWorksInMicroCms(galleryOrderedIds: string[]) {
+  try {
+    const currentWorks = await readWorksFromMicroCms();
+    const currentOrderById = new Map(
+      currentWorks.map((work) => [work.id ?? "", work.sortOrder])
+    );
+
+    const updates = galleryOrderedIds
+      .map((id, index) => ({
+        id,
+        order: index + 1
+      }))
+      .filter(({ id, order }) => currentOrderById.get(id) !== order);
+
+    if (updates.length === 0) {
+      return;
+    }
+
+    await runWithConcurrency(updates, 6, async ({ id, order }) => {
+      await microCmsRequest<MicroCmsWorkContent>(`/${WORKS_ENDPOINT}/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ order })
+      });
+    });
+  } catch (error) {
+    if (
+      error instanceof MicroCmsError &&
+      /order/i.test(error.message) &&
+      /unexpected key/i.test(error.message)
+    ) {
+      throw new Error(
+        "microCMS の works API に数字フィールド `order` を追加してください（並び替え用）。"
+      );
+    }
+
+    throw error;
+  }
 }
 
 export async function deleteWorkFromMicroCms(id: string) {

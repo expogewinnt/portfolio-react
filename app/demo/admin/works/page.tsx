@@ -6,7 +6,7 @@ export default function DemoAdminWorksPage() {
     <AdminShell
       mode="demo"
       title="Demo Works"
-      description="デモ用の作品一覧です。追加・編集・削除は localStorage に反映されます。"
+      description="デモ用の作品一覧です。ドラッグ＆ドロップで表示順を変更できます。変更は localStorage に反映されます。"
     >
       <DemoWorksList />
     </AdminShell>

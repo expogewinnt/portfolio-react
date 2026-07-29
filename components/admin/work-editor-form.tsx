@@ -31,7 +31,7 @@ export function WorkEditorForm({ mode, work }: WorkEditorFormProps) {
           <div>
             <h2 className="adminPanelTitle">New Work</h2>
             <p className="adminMuted">
-              タイトル、担当内容、画像を登録すると `works.json` と画像セットへ反映します。
+              タイトル、担当内容、画像を登録すると本番データ層（microCMS / works.json）へ反映します。
             </p>
           </div>
         </div>

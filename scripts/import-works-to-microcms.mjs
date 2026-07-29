@@ -155,7 +155,7 @@ async function uploadMedia(serviceDomain, apiKey, filePath) {
   return body.url;
 }
 
-async function createWork(serviceDomain, apiKey, work, imageUrl) {
+async function createWork(serviceDomain, apiKey, work, imageUrl, order) {
   const response = await fetch(`https://${serviceDomain}.microcms.io/api/v1/works`, {
     method: "POST",
     headers: {
@@ -165,7 +165,8 @@ async function createWork(serviceDomain, apiKey, work, imageUrl) {
     body: JSON.stringify({
       title: work.ttl,
       charge: work.charge,
-      image: imageUrl
+      image: imageUrl,
+      order
     })
   });
 
@@ -200,7 +201,7 @@ async function main() {
     try {
       await withRetry(work.ttl, async () => {
         const imageUrl = await uploadMedia(serviceDomain, apiKey, imagePath);
-        await createWork(serviceDomain, apiKey, work, imageUrl);
+        await createWork(serviceDomain, apiKey, work, imageUrl, index + 1);
       });
       existingTitles.add(work.ttl);
       console.log("OK");

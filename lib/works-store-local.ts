@@ -183,3 +183,23 @@ export async function updateWorkInLocal(input: {
   await writeWorksToLocal(works);
   return true;
 }
+
+export async function reorderWorksInLocal(galleryOrderedImageNames: string[]) {
+  assertLocalWritesAllowed();
+  const works = await readWorksFromLocal();
+  const byImageName = new Map(works.map((work) => [work.img, work]));
+
+  if (galleryOrderedImageNames.length !== works.length) {
+    throw new Error("並び替え対象の件数が一致しません。");
+  }
+
+  const nextWorks = galleryOrderedImageNames.map((imageName) => {
+    const work = byImageName.get(imageName);
+    if (!work) {
+      throw new Error(`並び替え対象が見つかりません: ${imageName}`);
+    }
+    return work;
+  });
+
+  await writeWorksToLocal(nextWorks);
+}

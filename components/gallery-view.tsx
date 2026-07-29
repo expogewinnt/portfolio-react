@@ -17,6 +17,7 @@ import {
 const MOBILE_BREAKPOINT = 768;
 const SCROLL_SPACE = 120;
 const SCROLL_FRICTION = 100;
+const OVERLAY_FADE_MS = 500;
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
@@ -61,9 +62,41 @@ function DesktopGallery({
   const contentRef = useRef<HTMLDivElement>(null);
   const smallsRef = useRef<HTMLUListElement>(null);
   const mouseXRef = useRef(0);
+  const closingIndexRef = useRef<number | null>(null);
+  const [displayedIndex, setDisplayedIndex] = useState<number | null>(activeIndex);
+  const [isClosing, setIsClosing] = useState(false);
+
+  /* Keep overlay mounted for fadeOut after activeIndex becomes null. */
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- overlay close animation lifecycle */
+    if (activeIndex !== null) {
+      closingIndexRef.current = activeIndex;
+      setIsClosing(false);
+      setDisplayedIndex(activeIndex);
+      return;
+    }
+
+    if (closingIndexRef.current === null) {
+      setDisplayedIndex(null);
+      setIsClosing(false);
+      return;
+    }
+
+    setIsClosing(true);
+    setDisplayedIndex(closingIndexRef.current);
+
+    const timerId = window.setTimeout(() => {
+      closingIndexRef.current = null;
+      setDisplayedIndex(null);
+      setIsClosing(false);
+    }, OVERLAY_FADE_MS);
+
+    return () => window.clearTimeout(timerId);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [activeIndex]);
 
   useEffect(() => {
-    if (activeIndex !== null) {
+    if (displayedIndex !== null) {
       return;
     }
 
@@ -105,25 +138,28 @@ function DesktopGallery({
       content.removeEventListener("mousemove", handleMouseMove);
       window.cancelAnimationFrame(frameId);
     };
-  }, [activeIndex]);
+  }, [displayedIndex]);
+
+  const overlayVisible = displayedIndex !== null;
+  const overlayMotionClass = isClosing ? "fadeOut" : "fadeIn";
 
   return (
     <>
       <div
-        className={`overlay ${activeIndex !== null ? "fadeIn" : ""} ${
-          activeIndex === null ? "" : "displayBlock"
-        }`}
-        onClick={onClose}
+        className={`overlay ${overlayVisible ? `${overlayMotionClass} displayBlock` : ""}`}
+        onClick={isClosing ? undefined : onClose}
       >
         <div className="bigsContainer">
           <ul className="bigs">
             {items.map((item, index) => {
-              const isActive = activeIndex === index;
+              const isActive = displayedIndex === index;
 
               return (
                 <li
                   key={getGalleryItemKey(item, index)}
-                  className={`imgObjContainer big ${isActive ? "fadeIn displayBlock" : ""}`}
+                  className={`imgObjContainer big ${
+                    isActive ? `${overlayMotionClass} displayBlock` : ""
+                  }`}
                 >
                   <div className="ttl">{decodeHtml(item.ttl)}</div>
                   <div className="imgContainer">

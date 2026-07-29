@@ -83,9 +83,10 @@ Vercel のファイルシステムは読み取り専用のため、本番の CRU
 | `MICROCMS_SERVICE_DOMAIN` + `MICROCMS_API_KEY` あり | microCMS（API ID: `works`） |
 | 未設定 | 従来どおり `works.json` + `public/images/` + sharp（ローカル開発向け） |
 
-- フィールド: `title` / `charge` / `image`
+- フィールド: `title` / `charge` / `image` / `order`（表示順）
 - 画像は Media API で 1 枚アップロードし、CDN クエリ（`?w=320` 等）でリサイズ
 - 初回移行: `npm run migrate:microcms`（`works.json` → microCMS）
+- `/admin/works`・`/demo/admin/works` はドラッグ＆ドロップで表示順を変更可能
 - Dashboard の Storage 表示で `microCMS` / `works.json` を確認可能
 
 詳細手順 → [microcms-integration-plan.md](./microcms-integration-plan.md)

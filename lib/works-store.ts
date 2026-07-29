@@ -5,12 +5,14 @@ import {
   createWorkInMicroCms,
   deleteWorkFromMicroCms,
   readWorksFromMicroCms,
+  reorderWorksInMicroCms,
   updateWorkInMicroCms
 } from "@/lib/microcms-client";
 import {
   createWorkInLocal,
   deleteWorkFromLocal,
   readWorksFromLocal,
+  reorderWorksInLocal,
   updateWorkInLocal
 } from "@/lib/works-store-local";
 import type { WorkItem } from "@/lib/works";
@@ -80,4 +82,19 @@ export async function updateWorkById(input: {
   }
 
   throw new Error("updateWorkById requires microCMS configuration.");
+}
+
+export async function reorderWorks(galleryOrderedWorks: Array<{ id?: string; img: string }>) {
+  if (isMicroCmsConfigured()) {
+    const ids = galleryOrderedWorks.map((work) => {
+      if (!work.id) {
+        throw new Error("microCMS の作品 ID が取得できません。");
+      }
+      return work.id;
+    });
+    await reorderWorksInMicroCms(ids);
+    return;
+  }
+
+  await reorderWorksInLocal(galleryOrderedWorks.map((work) => work.img));
 }
