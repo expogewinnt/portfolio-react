@@ -865,6 +865,7 @@ footer p {
 }
 
 .adminLoginCard {
+  box-sizing: border-box;
   width: min(100%, 440px);
   padding: 32px;
 }
@@ -881,15 +882,20 @@ footer p {
 .adminFormGrid {
   display: grid;
   gap: 16px;
+  min-width: 0;
 }
 
 .adminLoginForm {
   margin-top: 24px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .adminField {
   display: grid;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .adminField span {
@@ -901,7 +907,11 @@ footer p {
 
 .adminField input,
 .adminField textarea {
+  box-sizing: border-box;
+  display: block;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 12px 14px;
   border: 1px solid #d8cfbf;
   background: #fff;
